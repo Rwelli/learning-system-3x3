@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { Link } from 'react-router-dom';
 
 const API_URL = 'http://localhost:5000/api';
 
@@ -137,6 +138,13 @@ const AdminUsers = () => {
 
     return (
         <div className="users-container">
+            {/* زر البروفايل المصغر في الزاوية اليمنى */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '15px' }}>
+                <Link to="/profile" className="profile-icon-btn">
+                    👤 Профиль
+                </Link>
+            </div>
+
             <div className="section-header">
                 <h1>Управление пользователями</h1>
                 <button className="btn-primary" onClick={() => {

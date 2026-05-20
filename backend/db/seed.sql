@@ -20,6 +20,7 @@ ALTER SEQUENCE theory_id_seq RESTART WITH 1;
 -- 1. اضافة المجموعات
 INSERT INTO groups (name) VALUES ('Group DINRb-21');
 INSERT INTO groups (name) VALUES ('Group IVT-21');
+INSERT INTO groups (name) VALUES ('Group DEEB12');
 
 -- 2. اضافة المستخدمين
 -- كلمة المرور للجميع: 123456
@@ -37,6 +38,7 @@ INSERT INTO users (email, password_hash, full_name, role) VALUES
 -- 3. تحديث حقل teacher_id في المجموعات
 UPDATE groups SET teacher_id = (SELECT id FROM users WHERE email = 'teacher@example.com') WHERE name = 'Group DINRb-21';
 UPDATE groups SET teacher_id = (SELECT id FROM users WHERE email = 'teacher@example.com') WHERE name = 'Group IVT-21';
+UPDATE groups SET teacher_id = (SELECT id FROM users WHERE email = 'teacher@example.com') WHERE name = 'Group DEEB12';
 
 -- 4. تحديث group_id للطلاب
 UPDATE users SET group_id = (SELECT id FROM groups WHERE name = 'Group DINRb-21') WHERE email = 'student@example.com';

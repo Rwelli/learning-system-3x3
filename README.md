@@ -14,3 +14,5 @@
    ```bash
    cd backend && npm install
    cd frontend && npm install
+"# Веб-платформа для обучения системам 3?3" 
+"## Технологии: Node.js, React, PostgreSQL" 

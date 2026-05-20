@@ -16,9 +16,72 @@ const TestPage = () => {
     const [results, setResults] = useState({});
     const [submitting, setSubmitting] = useState(false);
 
+    // مفتاح التخزين في localStorage (فريد لكل اختبار ولكل مستخدم)
+    const getStorageKey = () => {
+        const token = getToken();
+        let userId = 'anonymous';
+        if (token) {
+            try {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                userId = payload.id;
+            } catch (e) {}
+        }
+        return `test_progress_${id}_user_${userId}`;
+    };
+
+    // حفظ التقدم في localStorage
+    const saveProgress = () => {
+        const progress = {
+            currentIndex,
+            answers,
+            results,
+            savedAt: new Date().toISOString()
+        };
+        localStorage.setItem(getStorageKey(), JSON.stringify(progress));
+        console.log('Прогресс сохранён:', progress);
+    };
+
+    // تحميل التقدم من localStorage
+    const loadProgress = () => {
+        const saved = localStorage.getItem(getStorageKey());
+        if (saved) {
+            try {
+                const progress = JSON.parse(saved);
+                setCurrentIndex(progress.currentIndex);
+                setAnswers(progress.answers);
+                setResults(progress.results);
+                console.log('Прогресс загружен:', progress);
+                return true;
+            } catch (e) {
+                console.error('Ошибка загрузки прогресса:', e);
+            }
+        }
+        return false;
+    };
+
+    // مسح التقدم من localStorage (عند إنهاء الاختبار)
+    const clearProgress = () => {
+        localStorage.removeItem(getStorageKey());
+        console.log('Прогресс очищен');
+    };
+
     useEffect(() => {
         fetchTest();
     }, [id]);
+
+    // بعد تحميل الاختبار، حاول استعادة التقدم
+    useEffect(() => {
+        if (questions.length > 0 && !loading) {
+            loadProgress();
+        }
+    }, [questions, loading]);
+
+    // حفظ التقدم تلقائياً عند تغيير السؤال أو الإجابات
+    useEffect(() => {
+        if (questions.length > 0 && !loading) {
+            saveProgress();
+        }
+    }, [currentIndex, answers, results]);
 
     const fetchTest = async () => {
         try {
@@ -111,6 +174,9 @@ const TestPage = () => {
                 body: JSON.stringify({ score, max_score: maxScore })
             });
             
+            // مسح التقدم بعد إنهاء الاختبار بنجاح
+            clearProgress();
+            
             navigate('/');
         } catch (err) {
             console.error('Failed to submit test:', err);
@@ -137,6 +203,10 @@ const TestPage = () => {
         return num.toFixed(2);
     };
 
+    // حساب نسبة الإكمال
+    const completedCount = Object.keys(results).length;
+    const progressPercent = questions.length > 0 ? (completedCount / questions.length) * 100 : 0;
+
     return (
         <div className="test-page">
             <div className="test-header-info">
@@ -144,6 +214,12 @@ const TestPage = () => {
                 <p>{test.description}</p>
                 <div className="progress-info">
                     Вопрос {currentIndex + 1} из {questions.length}
+                </div>
+                {/* شريط التقدم */}
+                <div className="progress-bar-container">
+                    <div className="progress-bar" style={{ width: `${progressPercent}%` }}>
+                        {Math.round(progressPercent)}%
+                    </div>
                 </div>
             </div>
 

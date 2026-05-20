@@ -116,3 +116,8 @@ CREATE INDEX idx_questions_test ON questions(test_id);
 CREATE INDEX idx_test_results_user ON test_results(user_id);
 CREATE INDEX idx_test_results_test ON test_results(test_id);
 CREATE INDEX idx_student_progress_user ON student_progress(user_id);
+
+-- إضافة حقول التصنيف التلقائي إلى جدول الاختبارات
+ALTER TABLE tests ADD COLUMN IF NOT EXISTS avg_time FLOAT DEFAULT 0;
+ALTER TABLE tests ADD COLUMN IF NOT EXISTS avg_question_difficulty FLOAT DEFAULT 0;
+ALTER TABLE tests ADD COLUMN IF NOT EXISTS auto_difficulty INT DEFAULT 1;

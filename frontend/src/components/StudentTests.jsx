@@ -19,7 +19,6 @@ const StudentTests = () => {
                 headers: { 'Authorization': `Bearer ${getToken()}` }
             });
             const data = await response.json();
-            // ترتيب الاختبارات حسب التوفر والأولوية
             const sortedTests = data.sort((a, b) => {
                 if (a.start_date && !b.start_date) return -1;
                 if (!a.start_date && b.start_date) return 1;
@@ -43,26 +42,21 @@ const StudentTests = () => {
         return true;
     };
 
-    const getDifficultyColor = (difficulty) => {
-        switch(difficulty) {
-            case 1: return '#28a745';
-            case 2: return '#ffc107';
-            case 3: return '#fd7e14';
-            case 4: return '#dc3545';
-            case 5: return '#6f42c1';
-            default: return '#6c757d';
-        }
-    };
-
     if (loading) {
         return <div className="loading">Загрузка тестов...</div>;
     }
 
     return (
         <div className="student-tests-container">
-            <div className="student-tests-header">
-                <h1>📚 Доступные тесты</h1>
-                <p>Выберите тест для прохождения</p>
+            {/* ✅ إضافة زر Профиль هنا */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <div>
+                    <h1>📚 Доступные тесты</h1>
+                    <p>Выберите тест для прохождения</p>
+                </div>
+                <Link to="/profile" className="btn-primary" style={{ padding: '10px 20px', textDecoration: 'none' }}>
+                    👤 Профиль
+                </Link>
             </div>
 
             {tests.length === 0 ? (

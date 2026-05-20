@@ -465,6 +465,9 @@ app.post('/api/test/:testId/complete', authenticate, async (req, res) => {
             [req.user.id, testId, score, max_score]
         );
         
+        // تحديث إحصائيات الاختبار تلقائياً
+        await updateTestStatistics(testId);
+        
         res.json(result.rows[0]);
     } catch (err) {
         console.error('Complete test error:', err);
@@ -489,6 +492,83 @@ app.get('/api/teacher/results', authenticate, authorize('teacher', 'admin'), asy
         res.status(500).json({ error: 'Server error' });
     }
 });
+
+// ===================== AUTO CLASSIFICATION =====================
+
+// حساب الإحصائيات بعد انتهاء الاختبار
+async function updateTestStatistics(testId) {
+    try {
+        // 1. حساب متوسط الوقت من test_results
+        const timeResult = await db.query(
+            `SELECT AVG(time_spent) as avg_time FROM test_results WHERE test_id = $1 AND time_spent IS NOT NULL`,
+            [testId]
+        );
+        const avgTime = parseFloat(timeResult.rows[0].avg_time) || 0;
+
+        // 2. حساب متوسط صعوبة الأسئلة في هذا الاختبار
+        const diffResult = await db.query(
+            `SELECT AVG(s.difficulty) as avg_diff 
+             FROM questions q
+             JOIN systems s ON q.system_id = s.id
+             WHERE q.test_id = $1`,
+            [testId]
+        );
+        const avgDiff = parseFloat(diffResult.rows[0].avg_diff) || 0;
+
+        // 3. تحديث جدول tests
+        await db.query(
+            `UPDATE tests 
+             SET avg_time = $1, avg_question_difficulty = $2
+             WHERE id = $3`,
+            [avgTime, avgDiff, testId]
+        );
+
+        // 4. تصنيف الصعوبة باستخدام kNN
+        await classifyTestDifficulty(testId, avgTime, avgDiff);
+    } catch (err) {
+        console.error('Update statistics error:', err);
+    }
+}
+
+// تصنيف الصعوبة باستخدام أقرب جيران (kNN)
+async function classifyTestDifficulty(testId, avgTime, avgDiff) {
+    try {
+        // اختبارات مرجعية (مُصنَّفة يدوياً مسبقاً)
+        const referenceTests = [
+            { id: 1, avg_time: 120, avg_diff: 1.5, difficulty: 1 },
+            { id: 2, avg_time: 180, avg_diff: 2.5, difficulty: 2 },
+            { id: 3, avg_time: 300, avg_diff: 4.0, difficulty: 3 },
+            { id: 4, avg_time: 400, avg_diff: 4.8, difficulty: 4 },
+            { id: 5, avg_time: 500, avg_diff: 5.0, difficulty: 5 }
+        ];
+
+        let minDistance = Infinity;
+        let predictedDifficulty = 3;
+
+        for (let ref of referenceTests) {
+            // المسافة الإقليدية (Euclidean distance)
+            const distance = Math.sqrt(
+                Math.pow(avgTime - ref.avg_time, 2) +
+                Math.pow(avgDiff - ref.avg_diff, 2)
+            );
+
+            if (distance < minDistance) {
+                minDistance = distance;
+                predictedDifficulty = ref.difficulty;
+            }
+        }
+
+        // تحديث الصعوبة التلقائية في قاعدة البيانات
+        await db.query(
+            `UPDATE tests SET auto_difficulty = $1 WHERE id = $2`,
+            [predictedDifficulty, testId]
+        );
+
+        console.log(`Test ${testId} classified as difficulty ${predictedDifficulty}`);
+    } catch (err) {
+        console.error('Classification error:', err);
+    }
+}
 
 // ===================== ADMIN ROUTES =====================
 
@@ -580,37 +660,31 @@ app.post('/api/groups', authenticate, authorize('admin'), async (req, res) => {
         res.status(500).json({ error: 'Server error' });
     }
 });
-// ===================== UPDATE PROFILE ROUTE =====================
 
-app.put('/api/profile', authenticate, async (req, res) => {
+// ===================== DIFFICULTY ROUTE =====================
+
+// Получение автоматической сложности теста
+app.get('/api/test/:id/difficulty', authenticate, async (req, res) => {
     try {
-        const { full_name, phone, bio } = req.body;
-        const userId = req.user.id;
-        
-        console.log('Updating profile for user:', userId);
-        console.log('Data:', { full_name, phone, bio });
-        
+        const { id } = req.params;
         const result = await db.query(
-            `UPDATE users 
-             SET full_name = COALESCE($1, full_name),
-                 phone = COALESCE($2, phone),
-                 bio = COALESCE($3, bio)
-             WHERE id = $4 
-             RETURNING id, email, full_name, role, phone, bio, created_at`,
-            [full_name, phone, bio, userId]
+            `SELECT id, title, auto_difficulty FROM tests WHERE id = $1`,
+            [id]
         );
-        
         if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'User not found' });
+            return res.status(404).json({ error: 'Test not found' });
         }
-        
-        console.log('Profile updated successfully');
-        res.json(result.rows[0]);
+        res.json({
+            test_id: result.rows[0].id,
+            title: result.rows[0].title,
+            predicted_difficulty: result.rows[0].auto_difficulty
+        });
     } catch (err) {
-        console.error('Update profile error:', err);
-        res.status(500).json({ error: 'Server error: ' + err.message });
+        console.error('Difficulty error:', err);
+        res.status(500).json({ error: 'Server error' });
     }
 });
+
 // Start server
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
